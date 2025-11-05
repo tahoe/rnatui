@@ -2,6 +2,8 @@
 name = "rnatui"
 version = "0.1.1"
 edition = "2024"
+description = "Ratatui based UI for NetActuate API using rnaapi library"
+license = "MIT"
 
 [dependencies]
 clap = "4.5.51"
