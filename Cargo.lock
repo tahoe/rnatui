@@ -1300,9 +1300,9 @@ dependencies = [
 
 [[package]]
 name = "rnaapi"
-version = "0.3.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2baed0ffcefdc6509d8936230bb27017471d4eb1424e0bce7e1f6cdb1292c760"
+checksum = "4eb85db75390bb4605887a821828cfb15ac8301280f349e89e25433a5f7d34d0"
 dependencies = [
  "axum",
  "chrono",
@@ -1320,7 +1320,7 @@ dependencies = [
 
 [[package]]
 name = "rnatui"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "reqwest",
