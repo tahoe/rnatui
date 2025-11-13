@@ -25,12 +25,13 @@
 //!
 //! That's it.
 //!
+use anyhow::Result;
 use clap::Parser;
 use rnaapi::config::{API_ADDRESS, API_KEY};
 use rnaapi::NaClient;
 
 #[tokio::main]
-async fn main() -> reqwest::Result<()> {
+async fn main() -> Result<()> {
     //! Test/Example "main" function, right now it just takes
     //! one argument, `-m <mbpkgid>` if not given, returns all the servers you own
 
