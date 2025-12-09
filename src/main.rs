@@ -29,7 +29,7 @@
 // This file is part of RNAAPI Rust API Client Library, licensed
 // under the GNU General Public License v3.0
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use rnaapi::config::Settings;
 use rnaapi::NaClient;
 
@@ -42,90 +42,114 @@ async fn main() -> Result<()> {
     let settings = Settings::new()?;
 
     // Defaults
-    let mut mbpkgid: u32 = 0;
-    let mut zoneid: u32 = 0;
+    let mut loc_mbpkgid: u32 = 0;
+    let mut loc_zoneid: u32 = 0;
+    let mut command: &str = "default";
 
     // parse our args into args
-    let args = SimpleArgs::parse();
+    let cli = Cli::parse();
 
-    if args.mbpkgid >= 1 {
-        mbpkgid = args.mbpkgid;
-    }
-
-    if args.zoneid >= 1 {
-        zoneid = args.zoneid;
+    // check cli sub commands
+    match &cli.command {
+        Some(Commands::Server { mbpkgid }) => {
+            if *mbpkgid >= 1 {
+                loc_mbpkgid = mbpkgid.clone();
+                command = "server";
+            } else {
+                command = "server";
+            }
+        }
+        Some(Commands::Dns { zoneid }) => {
+            if *zoneid >= 1 {
+                loc_zoneid = zoneid.clone();
+                command = "dns";
+            } else {
+                command = "dns";
+            }
+        }
+        None => {}
     }
 
     // playing with new constructor for client
     // let na_client = NaClient::new(API_KEY.to_owned(), API_ADDRESS.to_owned()).await;
     let na_client = NaClient::new(settings.api_key, settings.api_url).await;
 
-    if mbpkgid > 0 {
-        // submit jobs to the tokio async runtime
-        // this automatically awaits so no need for .await
-        let (srv, jobs, ipv4s, ipv6s, stat) = tokio::join!(
-            na_client.get_server(mbpkgid),
-            na_client.get_jobs(mbpkgid),
-            na_client.get_ipv4(mbpkgid),
-            na_client.get_ipv6(mbpkgid),
-            na_client.get_status(mbpkgid),
-        );
-
-        // print basic server info
-        println!(
-            "Package: {}, fqdn: {}, mbpkgid: {}",
-            srv.clone().unwrap().domu_package,
-            srv.clone().unwrap().fqdn,
-            srv.clone().unwrap().mbpkgid
-        );
-
-        println!();
-        // print the job data
-        for job in jobs.unwrap() {
-            println!(
-                "Inserted: {}, Status: {}, command: {}",
-                job.ts_insert, job.status, job.command
+    if command == "server" {
+        if loc_mbpkgid > 0 {
+            // submit jobs to the tokio async runtime
+            // this automatically awaits so no need for .await
+            let (srv, jobs, ipv4s, ipv6s, stat) = tokio::join!(
+                na_client.get_server(loc_mbpkgid),
+                na_client.get_jobs(loc_mbpkgid),
+                na_client.get_ipv4(loc_mbpkgid),
+                na_client.get_ipv6(loc_mbpkgid),
+                na_client.get_status(loc_mbpkgid),
             );
-        }
 
-        println!();
-        // print IPv4 Addresses
-        for ipv4 in ipv4s.unwrap() {
+            // print basic server info
             println!(
-                "Reverse: {}, IP: {}, Gateway: {}",
-                ipv4.reverse, ipv4.ip, ipv4.gateway
+                "Package: {}, fqdn: {}, mbpkgid: {}",
+                srv.clone().unwrap().domu_package,
+                srv.clone().unwrap().fqdn,
+                srv.clone().unwrap().mbpkgid
             );
+
+            println!();
+            // print the job data
+            for job in jobs.unwrap() {
+                println!(
+                    "Inserted: {}, Status: {}, command: {}",
+                    job.ts_insert, job.status, job.command
+                );
+            }
+
+            println!();
+            // print IPv4 Addresses
+            for ipv4 in ipv4s.unwrap() {
+                println!(
+                    "Reverse: {}, IP: {}, Gateway: {}",
+                    ipv4.reverse, ipv4.ip, ipv4.gateway
+                );
+            }
+
+            println!();
+            // print IPv6 Addresses
+            for ipv6 in ipv6s.unwrap() {
+                println!(
+                    "Reverse: {}, IP: {}, Gateway: {}",
+                    ipv6.reverse, ipv6.ip, ipv6.gateway
+                );
+            }
+
+            println!();
+            // print server status, very unverbose
+            println!("Status: {}", stat.unwrap().status);
+        } else {
+            let servers = na_client.get_servers().await?;
+            println!("Servers\n{:?}", servers);
         }
+    } else if command == "dns" {
+        if loc_zoneid > 0 {
+            println!();
+            // // print out the zone name
+            let zone = na_client.get_zone(loc_zoneid).await?;
+            println!("Zone: {}", zone.name);
 
-        println!();
-        // print IPv6 Addresses
-        for ipv6 in ipv6s.unwrap() {
-            println!(
-                "Reverse: {}, IP: {}, Gateway: {}",
-                ipv6.reverse, ipv6.ip, ipv6.gateway
-            );
+            // print out the SOA for the zone
+            let soa = zone.soa.unwrap();
+            println!("SOA: {}", soa.primary);
+
+            // print out the first record
+            let recs = zone.records.unwrap();
+            println!("1st Record: {}", recs[0].name);
+
+            // print out the first NS record
+            let nsrecs = zone.ns.unwrap();
+            println!("1st NS: {}", nsrecs[0])
+        } else {
+            let zones = na_client.get_zones().await?;
+            println!("Zones\n{:?}", zones);
         }
-
-        println!();
-        // print server status, very unverbose
-        println!("Status: {}", stat.unwrap().status);
-    } else if zoneid > 0 {
-        println!();
-        // // print out the zone name
-        let zone = na_client.get_zone(zoneid).await?;
-        println!("Zone: {}", zone.name);
-
-        // print out the SOA for the zone
-        let soa = zone.soa.unwrap();
-        println!("SOA: {}", soa.primary);
-
-        // print out the first record
-        let recs = zone.records.unwrap();
-        println!("1st Record: {}", recs[0].name);
-
-        // print out the first NS record
-        let nsrecs = zone.ns.unwrap();
-        println!("1st NS: {}", nsrecs[0])
     } else {
         // submit jobs to the tokio async runtime
         // this automatically awaits so no need for .await
@@ -204,16 +228,28 @@ async fn main() -> Result<()> {
 }
 
 ///
-/// This is the SimpleArgs struct
+/// This is the CLI Args struct
 ///
 #[derive(Parser, Debug)]
 #[command(version, about)]
-struct SimpleArgs {
-    // -m argument for picking an mbpkgid
-    #[arg(short, long, default_value_t = 0)]
-    mbpkgid: u32,
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
 
-    // -z argument for picking a dns zone
-    #[arg(short, long, conflicts_with = "mbpkgid", default_value_t = 0)]
-    zoneid: u32,
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Server subcommands
+    Server {
+        // -m argument for picking an mbpkgid
+        #[arg(short, long, default_value_t = 0)]
+        mbpkgid: u32,
+    },
+
+    /// DNS subcommands
+    Dns {
+        // -z argument for picking a dns zone
+        #[arg(short, long, default_value_t = 0)]
+        zoneid: u32,
+    },
 }
