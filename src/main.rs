@@ -30,8 +30,8 @@
 // under the GNU General Public License v3.0
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use rnaapi::config::Settings;
 use rnaapi::NaClient;
+use rnaapi::config::Settings;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
     match &cli.command {
         Some(Commands::Server { mbpkgid }) => {
             if *mbpkgid >= 1 {
-                loc_mbpkgid = mbpkgid.clone();
+                loc_mbpkgid = *mbpkgid;
                 command = "server";
             } else {
                 command = "server";
@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Dns { zoneid }) => {
             if *zoneid >= 1 {
-                loc_zoneid = zoneid.clone();
+                loc_zoneid = *zoneid;
                 command = "dns";
             } else {
                 command = "dns";
@@ -203,7 +203,10 @@ async fn main() -> Result<()> {
         println!();
         // print some ssh keys
         for sshkey in ssh_keys.unwrap() {
-            println!("Key: {}, Fingerprint: {}", sshkey.name, sshkey.fingerprint);
+            println!(
+                "Key: {}, Fingerprint: {}",
+                sshkey.name, sshkey.fingerprint
+            );
         }
 
         println!();
