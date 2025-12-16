@@ -42,6 +42,8 @@ async fn main() -> Result<()> {
     let settings = Settings::new()?;
 
     // Defaults
+    let mut ssh_keyid: u32 = 0;
+    let mut display_count: usize = 0;
     let mut loc_mbpkgid: u32 = 0;
     let mut loc_zoneid: u32 = 0;
     let mut command: &str = "default";
@@ -51,25 +53,46 @@ async fn main() -> Result<()> {
 
     // check cli sub commands
     match &cli.command {
-        Some(Commands::Server { mbpkgid }) => {
-            if *mbpkgid >= 1 {
-                loc_mbpkgid = *mbpkgid;
+        Some(Commands::Server { id }) => {
+            if *id >= 1 {
+                loc_mbpkgid = *id;
                 command = "server";
             } else {
                 command = "server";
             }
         }
-        Some(Commands::Dns { zoneid }) => {
-            if *zoneid >= 1 {
-                loc_zoneid = *zoneid;
+        Some(Commands::Dns { id }) => {
+            if *id >= 1 {
+                loc_zoneid = *id;
                 command = "dns";
             } else {
                 command = "dns";
             }
+        }
+        Some(Commands::Ssh { id }) => {
+            if *id >= 1 {
+                ssh_keyid = *id;
+                command = "ssh";
+            } else {
+                command = "ssh";
+            }
+        }
+        Some(Commands::Location {}) => {
+            command = "location";
+        }
+        Some(Commands::Invoice { count }) => {
+            display_count = *count;
+            command = "invoice";
+        }
+        Some(Commands::Image {}) => {
+            command = "image";
+        }
+        Some(Commands::Account {}) => {
+            command = "account";
         }
         None => {}
+        _ => todo!(),
     }
-
     // playing with new constructor for client
     // let na_client = NaClient::new(API_KEY.to_owned(), API_ADDRESS.to_owned()).await;
     let na_client = NaClient::new(settings.api_key, settings.api_url).await;
@@ -147,8 +170,76 @@ async fn main() -> Result<()> {
             let nsrecs = zone.ns.unwrap();
             println!("1st NS: {}", nsrecs[0])
         } else {
+            println!();
+            // list dns zones
             let zones = na_client.get_zones().await?;
-            println!("Zones\n{:?}", zones);
+            for zone in zones {
+                println!(
+                    "ID: {}, Size: {}, Name: {}",
+                    zone.id, zone.name, zone.zone_type
+                );
+            }
+        }
+    } else if command == "ssh" {
+        if ssh_keyid > 0 {
+            let sshkey = na_client.get_ssh_key(ssh_keyid).await?;
+            println!();
+            // print some ssh keys
+            println!(
+                "ID: {}, Key: {}, Fingerprint: {}",
+                sshkey.id, sshkey.name, sshkey.fingerprint
+            );
+        } else {
+            let keys = na_client.get_ssh_keys().await?;
+            println!();
+            // print some ssh keys
+            for sshkey in keys {
+                println!(
+                    "ID: {}, Key: {}, Fingerprint: {}",
+                    sshkey.id, sshkey.name, sshkey.fingerprint
+                );
+            }
+        }
+    } else if command == "location" {
+        let locs = na_client.get_locations().await?;
+        println!();
+        // list locations
+        for loc in locs {
+            println!(
+                "ID: {}, Name: {}, Continent: {}",
+                loc.id, loc.name, loc.continent
+            );
+        }
+    } else if command == "account" {
+        let deets = na_client.get_acct_details().await?;
+        println!();
+        // print acct details
+        println!(
+            "FullName: {:?}, Address: {:?}, {:?} {:?} {:?}",
+            deets.fullname,
+            deets.address1,
+            deets.city,
+            deets.state,
+            deets.postcode
+        );
+    } else if command == "image" {
+        let imgs = na_client.get_images().await?;
+        println!();
+        // list images
+        for img in imgs {
+            println!(
+                "ID: {}, Size: {}, Name: {}",
+                img.id,
+                img.size.unwrap_or("null".to_owned()),
+                img.os.unwrap_or("null".to_owned())
+            );
+        }
+        println!();
+    } else if command == "invoice" {
+        let invoices = na_client.get_acct_invoices().await?;
+        // print some of the invoices, say 3?
+        for invoice in invoices.iter().take(display_count) {
+            println!("ID: {}, Status: {}", invoice.id, invoice.status);
         }
     } else {
         // submit jobs to the tokio async runtime
@@ -244,15 +335,53 @@ struct Cli {
 enum Commands {
     /// Server subcommands
     Server {
-        // -m argument for picking an mbpkgid
+        // -i argument for picking an mbpkgid
         #[arg(short, long, default_value_t = 0)]
-        mbpkgid: u32,
+        id: u32,
     },
 
     /// DNS subcommands
     Dns {
-        // -z argument for picking a dns zone
+        // -i argument for picking a dns zone
         #[arg(short, long, default_value_t = 0)]
-        zoneid: u32,
+        id: u32,
     },
+
+    /// Job subcommands
+    Job {
+        // -i argument for picking a Job
+        #[arg(short, long, default_value_t = 0)]
+        id: u32,
+    },
+
+    /// SSh subcommands
+    Ssh {
+        // -i argument for ssh keyid
+        #[arg(short, long, default_value_t = 0)]
+        id: u32,
+    },
+
+    /// IPv4/6 subcommands
+    IPs {
+        // --proto argument (-p) for 4 or 6
+        // default to 4
+        #[arg(short, long, default_value_t = 4)]
+        proto: u32,
+    },
+
+    /// Location subcommands
+    Location {},
+
+    /// Invoices subcommands
+    Invoice {
+        // -i argument for number to display
+        #[arg(short, long, default_value_t = 5)]
+        count: usize,
+    },
+
+    /// Images subcommands
+    Image {},
+
+    /// Account subcommands
+    Account {},
 }
