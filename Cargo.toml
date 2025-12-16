@@ -1,6 +1,6 @@
 [package]
 name = "rnatui"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 description = "NetActuate API CLI client using rnaapi rust library"
 license = "MIT"
