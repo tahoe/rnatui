@@ -148,8 +148,11 @@ async fn main() -> Result<()> {
             // print server status, very unverbose
             println!("Status: {}", stat.unwrap().status);
         } else {
-            let servers = na_client.get_servers().await?;
-            println!("Servers\n{:?}", servers);
+            let srvrs = na_client.get_servers().await?;
+
+            for srvr in srvrs {
+                println!("ID: {}, fqdn: {}", srvr.mbpkgid, srvr.fqdn);
+            }
         }
     } else if command == "dns" {
         if loc_zoneid > 0 {
@@ -361,14 +364,13 @@ enum Commands {
         id: u32,
     },
 
-    /// IPv4/6 subcommands
-    IPs {
+    /// IPs subcommands
+    Ip {
         // --proto argument (-p) for 4 or 6
         // default to 4
         #[arg(short, long, default_value_t = 4)]
         proto: u32,
     },
-
     /// Location subcommands
     Location {},
 
