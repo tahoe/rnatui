@@ -32,6 +32,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use rnaapi::NaClient;
 use rnaapi::config::Settings;
+use rnaapi::endpoints;
+use rnaapi::{EndpointGetAll, EndpointGetArgs, EndpointGetOne};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -102,11 +104,26 @@ async fn main() -> Result<()> {
             // submit jobs to the tokio async runtime
             // this automatically awaits so no need for .await
             let (srv, jobs, ipv4s, ipv6s, stat) = tokio::join!(
-                na_client.get_server(loc_mbpkgid),
-                na_client.get_jobs(loc_mbpkgid),
-                na_client.get_ipv4(loc_mbpkgid),
-                na_client.get_ipv6(loc_mbpkgid),
-                na_client.get_status(loc_mbpkgid),
+                endpoints::Server::get_one(
+                    &na_client,
+                    EndpointGetArgs::OneInt(loc_mbpkgid)
+                ),
+                endpoints::SrvJob::get_all(
+                    &na_client,
+                    EndpointGetArgs::OneInt(loc_mbpkgid)
+                ),
+                endpoints::IPv4::get_all(
+                    &na_client,
+                    EndpointGetArgs::OneInt(loc_mbpkgid)
+                ),
+                endpoints::IPv6::get_all(
+                    &na_client,
+                    EndpointGetArgs::OneInt(loc_mbpkgid)
+                ),
+                endpoints::SrvStatus::get_one(
+                    &na_client,
+                    EndpointGetArgs::OneInt(loc_mbpkgid)
+                ),
             );
 
             // print basic server info
@@ -148,7 +165,9 @@ async fn main() -> Result<()> {
             // print server status, very unverbose
             println!("Status: {}", stat.unwrap().status);
         } else {
-            let srvrs = na_client.get_servers().await?;
+            let srvrs =
+                endpoints::Server::get_all(&na_client, EndpointGetArgs::NoArgs)
+                    .await?;
 
             for srvr in srvrs {
                 println!("ID: {}, fqdn: {}", srvr.mbpkgid, srvr.fqdn);
@@ -158,7 +177,11 @@ async fn main() -> Result<()> {
         if loc_zoneid > 0 {
             println!();
             // // print out the zone name
-            let zone = na_client.get_zone(loc_zoneid).await?;
+            let zone = endpoints::Zone::get_one(
+                &na_client,
+                EndpointGetArgs::OneInt(loc_zoneid),
+            )
+            .await?;
             println!("Zone: {}", zone.name);
 
             // print out the SOA for the zone
@@ -171,11 +194,13 @@ async fn main() -> Result<()> {
 
             // print out the first NS record
             let nsrecs = zone.ns.unwrap();
-            println!("1st NS: {}", nsrecs[0])
+            println!("1st NS: {}", nsrecs[0].name)
         } else {
             println!();
             // list dns zones
-            let zones = na_client.get_zones().await?;
+            let zones =
+                endpoints::Zone::get_all(&na_client, EndpointGetArgs::NoArgs)
+                    .await?;
             for zone in zones {
                 println!(
                     "ID: {}, Size: {}, Name: {}",
@@ -185,7 +210,11 @@ async fn main() -> Result<()> {
         }
     } else if command == "ssh" {
         if ssh_keyid > 0 {
-            let sshkey = na_client.get_ssh_key(ssh_keyid).await?;
+            let sshkey = endpoints::SSHKeys::get_one(
+                &na_client,
+                EndpointGetArgs::OneInt(ssh_keyid),
+            )
+            .await?;
             println!();
             // print some ssh keys
             println!(
@@ -193,7 +222,11 @@ async fn main() -> Result<()> {
                 sshkey.id, sshkey.name, sshkey.fingerprint
             );
         } else {
-            let keys = na_client.get_ssh_keys().await?;
+            let keys = endpoints::SSHKeys::get_all(
+                &na_client,
+                EndpointGetArgs::NoArgs,
+            )
+            .await?;
             println!();
             // print some ssh keys
             for sshkey in keys {
@@ -204,7 +237,9 @@ async fn main() -> Result<()> {
             }
         }
     } else if command == "location" {
-        let locs = na_client.get_locations().await?;
+        let locs =
+            endpoints::Location::get_all(&na_client, EndpointGetArgs::NoArgs)
+                .await?;
         println!();
         // list locations
         for loc in locs {
@@ -214,7 +249,9 @@ async fn main() -> Result<()> {
             );
         }
     } else if command == "account" {
-        let deets = na_client.get_acct_details().await?;
+        let deets =
+            endpoints::Details::get_one(&na_client, EndpointGetArgs::NoArgs)
+                .await?;
         println!();
         // print acct details
         println!(
@@ -226,7 +263,9 @@ async fn main() -> Result<()> {
             deets.postcode
         );
     } else if command == "image" {
-        let imgs = na_client.get_images().await?;
+        let imgs =
+            endpoints::Image::get_all(&na_client, EndpointGetArgs::NoArgs)
+                .await?;
         println!();
         // list images
         for img in imgs {
@@ -239,7 +278,9 @@ async fn main() -> Result<()> {
         }
         println!();
     } else if command == "invoice" {
-        let invoices = na_client.get_acct_invoices().await?;
+        let invoices =
+            endpoints::Invoices::get_all(&na_client, EndpointGetArgs::NoArgs)
+                .await?;
         // print some of the invoices, say 3?
         for invoice in invoices.iter().take(display_count) {
             println!("ID: {}, Status: {}", invoice.id, invoice.status);
@@ -248,14 +289,14 @@ async fn main() -> Result<()> {
         // submit jobs to the tokio async runtime
         // this automatically awaits so no need for .await
         let (srvrs, locs, pkgs, imgs, zones, ssh_keys, deets, invoices) = tokio::join!(
-            na_client.get_servers(),
-            na_client.get_locations(),
-            na_client.get_packages(),
-            na_client.get_images(),
-            na_client.get_zones(),
-            na_client.get_ssh_keys(),
-            na_client.get_acct_details(),
-            na_client.get_acct_invoices()
+            endpoints::Server::get_all(&na_client, EndpointGetArgs::NoArgs),
+            endpoints::Location::get_all(&na_client, EndpointGetArgs::NoArgs),
+            endpoints::Package::get_all(&na_client, EndpointGetArgs::NoArgs),
+            endpoints::Image::get_all(&na_client, EndpointGetArgs::NoArgs),
+            endpoints::Zone::get_all(&na_client, EndpointGetArgs::NoArgs),
+            endpoints::SSHKeys::get_all(&na_client, EndpointGetArgs::NoArgs),
+            endpoints::Details::get_one(&na_client, EndpointGetArgs::NoArgs),
+            endpoints::Invoices::get_all(&na_client, EndpointGetArgs::NoArgs),
         );
 
         for srvr in srvrs.unwrap() {
